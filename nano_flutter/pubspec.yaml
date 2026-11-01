@@ -1,0 +1,12 @@
+name: nano_flutter_workspace
+description: A 1:1 deconstructed simulation kernel of Flutter framework and C++ engine.
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  ffi: ^2.1.0
+
+dev_dependencies:
+  test: ^1.24.0

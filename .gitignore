@@ -1,0 +1,19 @@
+# Editor and local caches
+.cursor/
+.dart_tool/
+**/.dart_tool/
+
+# Build outputs
+*.o
+*.dylib
+*.so
+*.dll
+build/
+
+# OS
+.DS_Store
+
+# Flutter SDK snapshot (large third-party checkout, kept local only).
+# It is read-only reference material for the anatomy study; it is not part of
+# this repository and must not be published.
+flutter_source/
