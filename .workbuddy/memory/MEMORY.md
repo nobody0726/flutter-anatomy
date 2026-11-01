@@ -8,3 +8,9 @@
 
 ## 本地资源
 - `flutter_source/flutter/`：Flutter SDK 源码（含 packages/flutter、engine 相关 .dart/.cc/.h）
+- 该目录**仅本地保留**，已在 `.gitignore` 中整体排除，不进入版本库、不对外发布
+
+## 仓库
+- GitHub（public）：https://github.com/nobody0726/flutter-anatomy
+- 本地 `main` 已跟踪 `origin/main`；账号 `nobody0726`（gh CLI 已登录）
+- 历史策略：`legacy/sdk-snapshot` 分支保留重写前的旧提交（含 SDK 快照），仅本地存在，未推送
