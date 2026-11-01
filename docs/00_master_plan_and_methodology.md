@@ -1,34 +1,47 @@
 # Flutter 架构深度解构与 1:1 原理仿真工程总纲 (Master Blueprint)
 
-> **工程定位**：`Flutter-Anatomy-Lab`（`NanoFlutter` 微内核仿真引擎）  
-> **核心目标**：以本地 `flutter_source` 为唯一客观真理基准，借鉴操作系统内核解构标准（`docs/Linux.md`），通过**“5 步地毯式闭环扫描”**、**“四层模拟器抽象”**、**“全量代码边界划定”**与**“孪生差分测试”**，在数月周期内彻底吃透 Flutter 端到端底层运作机制。  
-> **技术路线**：方案 A（纯 Dart 逻辑微内核 + 现代 C++ 宿主桥接层）。
+> **工程定位**：`Flutter-Anatomy-Lab`（包含 `NanoFlutter` 运行时微内核仿真引擎与 `NanoCompiler` 编译构建工具链仿真引擎）  
+> **核心目标**：以本地 `flutter_source` 为唯一客观真理基准，借鉴操作系统内核解构标准（`docs/Linux.md`），通过**“5 步地毯式闭环扫描”**、**“四层模拟器抽象”**、**“全域代码边界划定”**与**“孪生差分测试”**，在数月周期内彻底吃透 Flutter **“编译期静态编译/热重载 + 运行期渲染管线”** 端到端底层运作机制。  
+> **技术路线**：方案 A（纯 Dart 逻辑微内核 + 现代 C++ 宿主桥接层 + 独立轻量构建编译器）。  
+> **专项蓝图索引**：编译期专项总纲参见 [`docs/00_compile_time_master_plan.md`](./00_compile_time_master_plan.md)。
 
 ---
 
 ## 目录
-1. [零遗漏证明：MECE 黑白灰盒分级边界矩阵](#一-零遗漏证明mece-黑白灰盒分级边界矩阵)
+1. [零遗漏证明：全域 MECE 黑白灰盒分级边界矩阵](#一-零遗漏证明全域-mece-黑白灰盒分级边界矩阵)
 2. [Flutter 源码“5 步地毯式闭环审计法”（无死角扫描）](#二-flutter-源码5-步地毯式闭环审计法无死角扫描)
-3. [八大核心模块生命周期与接口契约矩阵 (Lifecycle & API Matrix)](#三-八大核心模块生命周期与接口契约矩阵-lifecycle--api-matrix)
-4. [八大模块端到端源码文件穷尽清单 (Zero-Omission Manifest)](#四-八大模块端到端源码文件穷尽清单-zero-omission-manifest)
-5. [NanoFlutter 模拟器四层重构架构模型](#五-nanoflutter-模拟器四层重构架构模型)
+3. [全域十四大核心模块生命周期与接口契约矩阵 (Lifecycle & API Matrix)](#三-全域十四大核心模块生命周期与接口契约矩阵-lifecycle--api-matrix)
+4. [全域十四大模块端到端源码文件穷尽清单 (Zero-Omission Manifest)](#四-全域十四大模块端到端源码文件穷尽清单-zero-omission-manifest)
+5. [NanoFlutter + NanoCompiler 双引擎四层重构架构模型](#五-nanoflutter--nanocompiler-双引擎四层重构架构模型)
 6. [单模块解构执行标准化流程（SOP）与验收标准（DoD）](#六-单模块解构执行标准化流程sop与验收标准dod)
-7. [20 周多阶段长线工程全景路线图](#七-20-周多阶段长线工程全景路线图)
+7. [20 周全域多阶段长线工程全景路线图](#七-20-周全域多阶段长线工程全景路线图)
+8. [全域核心技术风险与架构防范机制（Pre-mortem Analysis）](#八-全域核心技术风险与架构防范机制pre-mortem-analysis)
 
 ---
 
-## 一、 零遗漏证明：MECE 黑白灰盒分级边界矩阵
+## 一、 零遗漏证明：全域 MECE 黑白灰盒分级边界矩阵
 
-借鉴 Linux 内核解构思想，解构复杂系统的第一要务是建立**认知防波堤**，确保核心逻辑白盒透彻，底座杂音严格黑盒隔离：
+借鉴 Linux 内核解构思想，解构包含**“编译构建系统”**与**“运行时渲染引擎”**的复杂工业级框架，第一要务是建立**全域认知防波堤**，确保编译期编排转换与运行期核心管线白盒透彻，底层黑盒杂音严格黑盒隔离：
 
 ```mermaid
 flowchart TD
     subgraph WhiteBox [⬜ 白盒核心层 (必须深入源码 1:1 独立原理复刻)]
-        W1[三棵树状态机: Widget/Element/RenderObject/State]
-        W2[单次遍历盒约束管线: BoxConstraints/RelayoutBoundary]
-        W3[图层树合成系统: LayerTree/RepaintBoundary]
-        W4[输入拓扑与手势竞技场: HitTest/GestureArenaManager]
-        W5[并发线程模型与消息泵: FML MessageLoop/TaskRunner]
+        direction TB
+        subgraph WB_Runtime [运行期微内核]
+            W1[三棵树状态机: Widget/Element/RenderObject/State]
+            W2[单次遍历盒约束管线: BoxConstraints/RelayoutBoundary]
+            W3[图层树合成系统: LayerTree/RepaintBoundary]
+            W4[输入拓扑与手势竞技场: HitTest/GestureArenaManager]
+            W5[并发线程模型与消息泵: FML MessageLoop/TaskRunner]
+        end
+        subgraph WB_Compile [编译期工具链]
+            WC1[构建编排有向无环图: BuildSystem / Target / Node DAG]
+            WC2[文件级增量缓存判断: FileStore / Depfile .d 语法解析]
+            WC3[常驻编译器交互状态机: ResidentCompiler Stdio 协议]
+            WC4[Flutter 专有 AST 变换: TrackWidgetCreation 位置参数注入]
+            WC5[字体字形树摇器: IconTreeShaker 扫描 AST 码位]
+            WC6[热重载重塑通道: DevFS 增量同步 / reassemble 状态保留]
+        end
     end
 
     subgraph GrayBox [🟨 灰盒协议层 (接口标准化、高效透传与 Stub 桩)]
@@ -37,24 +50,30 @@ flowchart TD
         G3[SurfaceView / ANativeWindow 表面呈现]
         G4[MockCanvas / 矢量指令流记录器]
         G5[MockParagraph / 简易字符排版模型]
+        GC1[Dart CFE Kernel AST 二进制协议 .dill]
+        GC2[VM Service JSON-RPC 2.0 调试与重载通信协议]
+        GC3[Impeller 离线着色器编译桥接: impellerc ShaderBundle]
+        GC4[AOT 快照生成器桥接: gen_snapshot 4 大内存段格式]
+        GC5[Native Assets 编译钩子协议: build.dart hook]
     end
 
     subgraph BlackBox [⬛ 黑盒底座层 (前期严格隔离，仅依赖标准运行环境)]
-        B1[Dart VM: 编译器汇编生成 / JIT / AOT / 垃圾回收GC内部算法]
-        B2[Skia/Impeller: GPU 着色器编译 / 贝塞尔三角剖分 / VBO 顶点缓冲]
-        B3[HarfBuzz/ICU: 复杂文字塑形 / 连字匹配 / Unicode Bidi 排版]
+        B1[Dart VM 后端汇编器: SSA 中间表示优化 / 寄存器分配 / 机器码发射内部细节]
+        B2[Skia/Impeller: GPU 驱动底层 / 贝塞尔三角剖分 / VBO 顶点缓冲]
+        B3[HarfBuzz/ICU: 复杂文字塑形 / 连字匹配 / Unicode Bidi 底层算法]
         B4[Linux Kernel / 显卡芯片驱动 / EGL 驱动底层细节]
+        BC1[平台原生构建打包器: Android AAPT2/D8/R8、Apple ld64/codesign、Xcode 内部流水线]
     end
 
-    WhiteBox <==>|接口调用| GrayBox
+    WhiteBox <==>|接口调用 / 指令通信| GrayBox
     GrayBox -. 驱动底座 .-> BlackBox
 ```
 
 | 分级 | 涉及组件 | 隔离与处理策略 (How to isolate) | 预期收益 (Gain) |
 | :--- | :--- | :--- | :--- |
-| **黑盒** | Dart VM 编译器、Skia/Impeller 着色器、HarfBuzz/ICU 复杂字型、GPU EGL 交换链 | **严格当作黑盒**。Dart 直接使用现有 SDK 运行时执行；Canvas 抽象为 `MockCanvas` 记录绘制指令；文字排版初期基于字符数估算盒模型。 | 抽离平台与图形硬件无关杂音，聚焦渲染流水线、排版数学模型与三棵树核心状态机。 |
-| **灰盒** | C-ABI 导出层、Android Choreographer 帧脉冲、Surface 载体绑定 | **定义标准最小协议**。C++ 导出 C 函数供 Dart FFI 直连；Android Vsync 通过 JNI 透传，终端环境下由高精度定时器等价替换。 | 保证时钟对齐时序与真实设备 100% 等价，消除通信协议开销。 |
-| **白盒** | FML 线程、渲染管线、单次遍历布局、三棵树 Diff、Layer 合成、手势竞技场 | **100% 深入源码逐行精读，并在 `nano_flutter` 中用纯 Dart / C++ 进行 1:1 独立重写与测试断言。** | 彻底洞悉 Flutter 响应式设计、单次遍历不回流机制、局部重绘隔离的核心机密。 |
+| **黑盒** | `gen_snapshot` 机器指令发射内部细节、HarfBuzz 复杂排版底层、glslang 语法分析器、AAPT2/D8/R8 打包器、GPU EGL 交换链 | **严格当作外部工具黑盒**。调用官方 SDK 附带的预编译二进制或使用标准 Mock 脚本；输入产物与输出文件严格核验，不自研机器码汇编器与 GPU 驱动。 | 抽离 CPU 指令集架构与平台打包工具链杂音，聚焦渲染流水线、排版数学模型与构建编排增量核心。 |
+| **灰盒** | C-ABI 导出层、Android Choreographer 脉冲、Kernel AST（.dill）协议、VM Service RPC、`impellerc` 参数规范、Native Assets hook | **定义标准最小协议与 Stub 桩**。跨语言以 C-ABI/FFI 直连；编译期协议基于标准化 JSON-RPC 与二进制结构封装，终端环境下由虚拟测试桩等价替换。 | 保证时钟对齐时序与编译器通信 100% 等价，消除通信环境依赖，实现毫秒级自动化闭环。 |
+| **白盒** | FML 线程、渲染管线、单次遍历布局、三棵树 Diff、Layer 合成、手势竞技场、BuildSystem DAG、增量 FileStore、ResidentCompiler 状态机、Widget 坐标注入、Icon 树摇、DevFS 热重载 | **100% 深入源码逐行精读，并在 `nano_flutter` 与 `nano_compiler` 中用纯 Dart / C++ 进行 1:1 独立重写与测试断言。** | 彻底洞悉 Flutter 响应式声明式 UI、单次遍历不回流、局部重绘隔离、亚秒级热重载与生产态极致体积压缩的核心机密。 |
 
 ---
 
@@ -105,9 +124,34 @@ Flutter 的高性能局部刷新完全依赖核心对象的状态标记位。必
 
 ---
 
-## 三、 八大核心模块生命周期与接口契约矩阵 (Lifecycle & API Matrix)
+## 三、 全域十四大核心模块生命周期与接口契约矩阵 (Lifecycle & API Matrix)
 
-对标 `Linux.md` 第二、三节，清晰界定每个模块的生命周期契约、核心对象与对外暴露的 API：
+对标 `Linux.md` 第二、三节，清晰界定整个工程十四大核心模块（**运行期 8 大模块 + 编译期 6 大模块**）的生命周期契约、核心对象与对外暴露的 API（编译期完整推导详见 [`docs/00_compile_time_master_plan.md`](./00_compile_time_master_plan.md)）：
+
+```mermaid
+flowchart LR
+    subgraph CompileDomain [编译构建域 (Compile-Time Toolchain)]
+        C1[模块 C1: 构建编排与增量驱动]
+        C2[模块 C2: Kernel 前端与 AST 变换]
+        C3[模块 C3: 常驻守护与热重载重构]
+        C4[模块 C4: AOT 快照与机器码生成]
+        C5[模块 C5: 字体树摇与离线着色器]
+        C6[模块 C6: 插件元编程与代码生成]
+    end
+
+    subgraph RuntimeDomain [运行渲染域 (Runtime Engine & Framework)]
+        R1[模块 1: Android 宿主与 Channel]
+        R2[模块 2: FML 线程与 Vsync 调度]
+        R3[模块 3: 单次遍历盒排版内核]
+        R4[模块 4: Flex 弹性盒与滚动视口]
+        R5[模块 5: 响应式三棵树状态机]
+        R6[模块 6: 图层树合成与重绘隔离]
+        R7[模块 7: 输入路由与手势竞技场]
+        R8[模块 8: 动画时钟驱动与物理场]
+    end
+
+    CompileDomain ==>|产物交付与增量更新| RuntimeDomain
+```
 
 | 模块编号与名称 | 初始化/挂载时机 (Lifecycle Entry) | 核心内部状态机与持有对象 | 对外核心 API 契约 (Exported APIs) | 销毁/回收时机 (Teardown/GC) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -119,12 +163,20 @@ Flutter 的高性能局部刷新完全依赖核心对象的状态标记位。必
 | **模块 6：图层树合成与重绘边界** | 首次 `flushPaint()`，创建 `PaintingContext` | `LayerTree` 拓扑树，`isRepaintBoundary` 独立图层容器 | `pushLayer()`, `addLayer()`, `SceneBuilder.build()`, `Window.render()` | 节点重绘时释放旧 `Picture` / 图层被整树替换时 |
 | **模块 7：手势拓扑路由与竞技场** | 触摸事件到达，`GestureBinding` 分发 | `HitTestResult` 目标路径链，`GestureArenaManager` 投票池 | `handlePointerEvent()`, `hitTest()`, `add()`, `resolve()`, `accept()`, `reject()` | 手指抬起 `PointerUp`，竞技场清空胜出者后关闭 |
 | **模块 8：时钟动画驱动与物理场** | 业务声明 Controller，绑定 `TickerProvider` | `AnimationController`（Dismissed, Forward, Reverse, Completed） | `forward()`, `reverse()`, `animateTo()`, `evaluate(Animation)`, `simulate()` | `AnimationController.dispose()`，Ticker 从时钟解绑 |
+| **模块 C1：构建编排引擎与增量缓存驱动** | `flutter build/run` 命令初始化 `BuildSystem` | `Node` 拓扑图、`FileStore` 内存哈希表、`DepfileService` | `build(Target, Environment)`, `canSkip()`, `findInvalidated()` | 构建完毕将文件哈希持久化至磁盘 `.flutter-plugins-dependencies` |
+| **模块 C2：Dart Kernel 前端编译与 AST 变换** | 首次执行 `KernelSnapshot` 构建任务 | `KernelCompiler`、`TargetModel`、AST 访问器状态 | `compile(mainPath, sdkRoot)`, AST 注入 `TrackWidgetCreation` | 生成根目录 `app.dill` 与符号依赖表，退出或驻留常驻池 |
+| **模块 C3：增量编译守护、DevFS 与热重载** | `flutter run` 启动 `HotRunner` 并连接设备 | `ResidentCompiler` (Stdio 进程通道)、`DevFS` 追踪器 | `recompile()`, `accept()`, `reject()`, `reloadSources()`, `reassemble()` | 用户退出交互调试会话（`q`），杀死常驻编译器与清理 DevFS |
+| **模块 C4：AOT 快照编译与多段二进制生成** | 执行 Profile/Release 模式的 `AotSnapshotBase` | `AOTSnapshotter`、`GenSnapshot` 参数生成器 | `build(platform, buildMode, dillPath, outputPath)` | 产出物理共享库 `app.so` / `App.framework`，剥离 DWARF 符号 |
+| **模块 C5：资产多维树摇与离线着色器编译** | `CopyFlutterBundle` 与 `AssetBundle.build()` | `IconTreeShaker` (持有码位集)、`ShaderCompiler` (持有并发池) | `copyAssets()`, `compileShader()`, `subsetFont()` | 输出精简版 `MaterialIcons-Regular.otf` 与 `ShaderBundle` 字节流 |
+| **模块 C6：插件自动注册元编程与 Native Assets** | `flutter pub get` 完成后或构建第一步 | `PackageConfig` 字典、Mustache 模板渲染器 | `generateMainDartWithPluginRegistrant()`, `BuildHooks.build()` | 生成 `.dart_tool/flutter_build/dart_plugin_registrant.dart` |
 
 ---
 
-## 四、 八大模块端到端源码文件穷尽清单 (Zero-Omission Manifest)
+## 四、 全域十四大模块端到端源码文件穷尽清单 (Zero-Omission Manifest)
 
 源码基准绝对路径：`/Volumes/MacBookData/workspace/flutter-anatomy/flutter_source/flutter`
+
+### 运行期微内核体系 (模块 1 ~ 模块 8)
 
 ### 模块 1：Android 宿主嵌入层与跨语言双向通讯底座
 *   **Android 宿主 (Java)** (`engine/src/flutter/shell/platform/android/io/flutter/`):
@@ -237,33 +289,101 @@ Flutter 的高性能局部刷新完全依赖核心对象的状态标记位。必
 
 ---
 
-## 五、 NanoFlutter 模拟器四层重构架构模型
+### 编译期工具链体系 (模块 C1 ~ 模块 C6)
+*(详细代码走查与专项分析参见 [`docs/00_compile_time_master_plan.md`](./00_compile_time_master_plan.md))*
 
-对标 `Linux.md` 第一节中内存管理模拟器的四层模型，`NanoFlutter` 剥离 GPU 与 OS 汇编，建立纯用户态模拟器模型：
+### 模块 C1：构建编排引擎与 DAG 增量缓存机制 (BLD)
+*   **构建编排核心** (`packages/flutter_tools/lib/src/build_system/`):
+    *   `build_system.dart` —— `BuildSystem` 调度中枢、`Target` 抽象基类、`Environment` 构建上下文
+    *   `build_targets.dart` —— 构建目标字典与默认目标集合
+    *   `file_store.dart` —— 文件内容散列比对器与增量指纹持久化引擎
+    *   `depfile.dart` —— Makefile 格式依赖描述文件解析器与生成器
+    *   `source.dart` —— 灵活声明输入输出的 `Source` 抽象（模式匹配、环境变量求值、工件引用）
+    *   `hash.dart` —— 高性能文件流 SHA-256 增量哈希计算
+    *   `exceptions.dart` —— 构建阶段异常定义（MissingDefineException, CircularDependencyException）
+*   **通用构建目标** (`packages/flutter_tools/lib/src/build_system/targets/`):
+    *   `common.dart` —— `KernelSnapshot`、`AotSnapshotBase`、`CopyFlutterBundle` 基础目标定义
+
+### 模块 C2：Dart Kernel 前端编译与 AST 专项变换 (KRN)
+*   **编译器前端调用桥接** (`packages/flutter_tools/lib/src/`):
+    *   `compile.dart` —— `KernelCompiler`、`ResidentCompiler`、`DefaultResidentCompiler`、`TargetModel`
+    *   `artifacts.dart` —— 编译器预编译工件路径寻址器（`frontend_server.dart.snapshot`、`patched_sdk`）
+    *   `build_info.dart` —— `BuildMode`（debug/profile/release）、编译选项解构
+*   **引擎侧前端编译器接入** (`engine/src/flutter/flutter_frontend_server/`):
+    *   `BUILD.gn`, `pubspec.yaml`
+*   **AST 变换规范**:
+    *   `TrackWidgetCreation` 构造器行号列号注桩规范（注入 `$creationLocation` 字段）
+    *   `ConstCanonicalization` 跨文件不可变对象合并机制
+
+### 模块 C3：增量编译守护、DevFS 传输与热重载重构 (HOT)
+*   **常驻运行中枢** (`packages/flutter_tools/lib/src/`):
+    *   `run_hot.dart` —— `HotRunner`、`_reloadSources`、`_hotReloadHelper`、状态防抖与耗时度量
+    *   `resident_runner.dart` —— 交互式命令行键盘事件分发器（`r` / `R` / `q`）
+    *   `devfs.dart` —— 内存虚拟文件系统、文件内容差分提取、增量字节流序列化
+    *   `vmservice.dart` —— Dart VM Service JSON-RPC 客户端封装、隔离区（Isolate）重载驱动
+*   **运行时状态无损协同** (`packages/flutter/lib/src/widgets/`):
+    *   `framework.dart` —— `Element.reassemble()` 遍历标记全部节点脏状态并保留 `State`
+
+### 模块 C4：生产态 AOT 快照编译与多段二进制生成 (AOT)
+*   **快照构建器驱动** (`packages/flutter_tools/lib/src/base/` 及 `build_system/targets/`):
+    *   `build.dart` —— `AOTSnapshotter`、`GenSnapshot` 物理参数组装（`--snapshot-kind=app-aot-elf`）
+    *   `targets/common.dart` —— `AotSnapshotProfile`、`AotSnapshotRelease` 目标声明
+    *   `targets/android.dart` —— Android 平台生成 `libapp.so`
+    *   `targets/darwin.dart` / `ios.dart` —— Apple 平台生成 `App.framework`
+*   **引擎底层快照映射** (`engine/src/flutter/runtime/`):
+    *   `dart_snapshot.h / .cc` —— 映射 ELF 段到 `vm_snapshot_data`、`vm_snapshot_instr`、`isolate_snapshot_data`、`isolate_snapshot_instr`
+    *   `dart_vm.cc` —— 接收 4 大内存段初始化 Dart 虚拟机堆空间
+
+### 模块 C5：资产多维树摇与离线着色器编译 (SHK)
+*   **字体字形裁剪体系** (`packages/flutter_tools/lib/src/build_system/targets/` 及 `engine/`):
+    *   `targets/icon_tree_shaker.dart` —— 解析 `recorded_uses.json`，调度 `font-subset` 物理裁剪
+    *   `engine/src/flutter/tools/font_subset/main.cc` —— C++ 基于 HarfBuzz 的字形裁剪命令行工具
+    *   `engine/src/flutter/tools/font_subset/hb_wrappers.h` —— HarfBuzz 字体封装
+*   **Impeller 离线着色器流水线** (`packages/flutter_tools/lib/src/build_system/tools/` 及 `engine/`):
+    *   `tools/shader_compiler.dart` —— `ShaderCompiler`、`DevelopmentShaderCompiler`（开发态着色器热重载）
+    *   `engine/src/flutter/impeller/compiler/impellerc_main.cc` —— 离线着色器编译器入口
+    *   `engine/src/flutter/impeller/compiler/compiler.cc` —— GLSL 转换为 SPIR-V / MSL
+    *   `engine/src/flutter/impeller/compiler/shader_bundle.cc` —— 离线打包为多后端 `ShaderBundle`
+*   **通用资产打包** (`packages/flutter_tools/lib/src/`):
+    *   `asset.dart` —— `AssetBundle`、`AssetManifest.bin` 紧凑二进制格式序列化
+    *   `build_system/targets/assets.dart` —— `copyAssets` 构建目标实现
+
+### 模块 C6：插件自动注册元编程与 Native Assets (GEN)
+*   **插件路由静态合成** (`packages/flutter_tools/lib/src/build_system/targets/`):
+    *   `targets/dart_plugin_registrant.dart` —— `DartPluginRegistrantTarget` 目标驱动
+    *   `flutter_plugins.dart` —— 解析 `pubspec.yaml` 插件映射，生成 `dart_plugin_registrant.dart`
+*   **Native Assets 静态绑定** (`packages/flutter_tools/lib/src/build_system/targets/` 及 `isolated/`):
+    *   `targets/native_assets.dart` —— `BuildHooks` 目标，驱动执行各 package 根目录下的 `build.dart`
+    *   `isolated/native_assets/native_assets.dart` —— C/C++ FFI 源码编译与产物链接
+
+---
+
+## 五、 NanoFlutter + NanoCompiler 双引擎四层重构架构模型
+
+对标 `Linux.md` 第一节中模拟器的四层模型，工程建立涵盖**运行期渲染微内核 (`NanoFlutter`)**与**编译期构建工具链 (`NanoCompiler`)**的统一纯用户态仿真沙盒：
 
 ```
-+--------------------------------------------------------------------------+
-| 4. 驱动、观测与差分测试层 (Test Harness, Tree Dumper, Diff Inspector)    |
-|    - 差分比对器 (自动对比官方与自研树的 Size / Offset / Layer / HitTest) |
-|    - 终端 ASCII 布局树 / SVG 矢量预览导出                                 |
-+--------------------------------------------------------------------------+
-| 3. 业务状态机与三棵树层 (NanoWidgets & NanoElements)                     |
-|    - Widget 声明式 DSL                                                   |
-|    - Element 树形骨架持有与 canUpdate() 复用逻辑                         |
-|    - BuildOwner 脏节点批量重构管理                                       |
-+--------------------------------------------------------------------------+
-| 2. 核心渲染与调度算法层 (NanoRendering & NanoScheduler)                 |
-|    - BoxConstraints 单次遍历排版 (Constraints down, sizes up)             |
-|    - RelayoutBoundary 局部重排阻断算法                                   |
-|    - PaintingContext 图层合成与 RepaintBoundary 缓存                     |
-|    - GestureArenaManager 手势竞技仲裁算法                                |
-+--------------------------------------------------------------------------+
-| 1. 虚拟硬件与宿主环境 Mock 层 (Virtual Hardware & Host Mock)             |
-|    - VirtualVsync (高精度纳秒定时器或 Android Choreographer 桥接)        |
-|    - MockCanvas (矢量绘图指令流记录器，记录 DrawRect/DrawPath 等 OpCode)   |
-|    - MockParagraph (简易等宽字符盒模型估算器)                            |
-|    - FakePointerStream (离散触控事件生成器: Down -> Move -> Up)          |
-+--------------------------------------------------------------------------+
++----------------------------------------------------------------------------------------------------+
+| 4. 驱动、观测与差分测试层 (Test Harness, Tree Dumper, AST Inspector, Diff Inspector)              |
+|    - 运行时差分器: 比对官方与 NanoFlutter 的 Size / Offset / Layer / HitTest                       |
+|    - 编译期差分器: 比对官方 dill 与 NanoCompiler 的 AST 节点、符号表与 DAG 拓扑执行序             |
+|    - 终端双模可视化: ASCII 布局树导出器 + DAG 依赖图导出器                                         |
++----------------------------------------------------------------------------------------------------+
+| 3. 业务状态机、元编程与三棵树层 (NanoWidgets & NanoElements & NanoCodegen)                        |
+|    - 运行时状态机: Widget 声明式 DSL / Element 树形骨架持有与 canUpdate() / BuildOwner 批量脏重构  |
+|    - 编译期元编程: TrackWidgetCreation AST 物理坐标注入器 / DartPluginRegistrant 代码合成器         |
++----------------------------------------------------------------------------------------------------+
+| 2. 核心算法与编排流水线层 (NanoRendering, NanoScheduler & NanoBuildSystem, NanoDevFS)             |
+|    - 渲染算法: BoxConstraints 单次遍历排版 / RelayoutBoundary 隔离 / PaintingContext 合成 / 手势竞技|
+|    - 编译算法: NanoBuildSystem DAG 拓扑排序 / NanoFileStore SHA-256 指纹 / Depfile 解析 / DevFS 差分|
+|    - 热重载协调: ResidentCompiler Stdio 状态机 / VM Service reloadSources 触发 / reassemble 状态保留 |
++----------------------------------------------------------------------------------------------------+
+| 1. 虚拟硬件、编译器协议与宿主环境 Mock 层 (Virtual Hardware, Host & Subprocess Mock)              |
+|    - 硬件时钟: VirtualVsync (高精度纳秒定时器或 Android Choreographer 桥接)                        |
+|    - 绘图抽象: MockCanvas (矢量绘图指令流记录器) / MockParagraph (等宽字符盒模型)                 |
+|    - 编译器桩: MockFrontendServer (Stdio 模拟器) / MockImpellerc (伪着色器包) / MockFontSubsetter |
+|    - 虚拟环境: VirtualFileSystem (纯内存文件系统) / FakePointerStream (离散触控生成器)             |
++----------------------------------------------------------------------------------------------------+
 ```
 
 ---
@@ -320,31 +440,36 @@ flowchart LR
 
 ---
 
-## 七、 20 周多阶段长线工程全景路线图
+## 七、 20 周全域多阶段长线工程全景路线图
 
-| 阶段 | 周期 | 攻坚模块 | 核心交付物 | 阶段验收门禁 (Exit Criteria) |
+将**运行期微内核仿真（Line A~D）**与**编译构建工具链仿真（Line E）**深度交织，建立端到端协同演进的多阶段工程路线图：
+
+| 阶段 | 周期 | 运行期攻坚模块 | 编译期攻坚模块 | 核心交付物与里程碑门禁 (Exit Criteria) |
 | :--- | :--- | :--- | :--- | :--- |
-| **阶段一** | 第 1~3 周 | **模块 1 & 模块 2**<br>(宿主通讯 / FML 线程 / Vsync) | • C++ 线程模型与 TaskRunner<br>• VsyncWaiter JNI / FFI 桥接<br>• `SchedulerBinding` 五阶段 | 终端稳定跑通 60/120Hz 脉冲派发，跨语言纳秒时钟单调对齐，单测 100% 通过。 |
-| **阶段二** | 第 4~6 周 | **模块 3**<br>(盒约束单次布局微内核) | • `BoxConstraints` 算法库<br>• `RenderBox` / `PipelineOwner`<br>• RelayoutBoundary 隔离机制 | 能够定义复杂嵌套盒子并在终端输出绝对坐标矩阵，局部重排隔离断言全部通过。 |
-| **阶段三** | 第 7~10 周 | **模块 5**<br>(响应式三棵树状态机) | • `Widget/Element/RenderObject`<br>• `BuildOwner` 调度中心<br>• `canUpdate` Diff 算法<br>• `InheritedWidget` $O(1)$ 通知 | 节点增删、同级交换、带 Key 重排等复杂场景，Diff 行为与官方期望 100% 对齐。 |
-| **阶段四** | 第 11~14 周 | **模块 4 & 模块 6 & 模块 7**<br>(Flex/图层合成/手势竞技) | • Flex 主轴交叉轴两轮切分<br>• `LayerTree` 合成与重绘缓存<br>• `GestureArenaManager` 仲裁器 | 给定多指复杂滑动轨迹精确判定胜出者；动画触发时图层合成准确拦截父级重绘。 |
-| **阶段五** | 第 15~18 周 | **模块 8 & Android 宿主联调**<br>(动画物理场 / 真机闭环) | • 极简 Android Native APK 宿主<br>• SurfacePresenter 画布渲染<br>• 触摸事件原生分发转换 | 在 Android 真实设备上流畅运行纯自研微内核呈现的交互界面（带动画、可点击）。 |
-| **阶段六** | 第 19~20 周 | **差分收敛与结项归档**<br>(孪生比对 / 白皮书总结) | • 《Flutter 底层架构解构白皮书》全套<br>• 完整孪生差分测试报告 | 与官方 Flutter 同一颗复杂界面的排版几何与图层输出达到工业级对齐。 |
+| **阶段一** | 第 1~3 周 | **模块 1 & 模块 2**<br>(宿主通讯 / FML 线程 / Vsync) | **模块 C1**<br>(构建编排 / DAG 拓扑 / Depfile 增量) | • 终端跑通 60/120Hz Vsync 脉冲派发，跨语言时钟对齐<br>• `NanoBuildSystem` 解析依赖 DAG，实现 Makefile .d 增量缓存<br>• 门禁：时钟单调递增，未变动目标 100% 命中 `canSkip`。 |
+| **阶段二** | 第 4~6 周 | **模块 3**<br>(盒约束单次布局微内核) | **模块 C2**<br>(Dart Kernel 前端 / AST 变换) | • `RenderBox` / `BoxConstraints` 单次遍历算法库<br>• `TrackWidgetCreation` 注入 Widget 构造函数物理坐标<br>• 门禁：终端输出 ASCII 布局树；AST 注桩位置与官方 100% 对齐。 |
+| **阶段三** | 第 7~10 周 | **模块 5**<br>(响应式三棵树状态机) | **模块 C3**<br>(常驻编译器 / DevFS / 热重载) | • `Widget/Element/RenderObject` 三重解耦与 Diff<br>• `ResidentCompiler` Stdio 状态机与 DevFS 差分同步<br>• 门禁：动态增删节点 Diff 行为对齐；热重载触发 UI `reassemble` 且 `State` 无损保持。 |
+| **阶段四** | 第 11~14 周 | **模块 4 & 6 & 7**<br>(Flex/图层合成/手势竞技) | **模块 C5**<br>(字体树摇 / Impeller 离线着色) | • Flex 两轮切分、`LayerTree` 合成与 `RepaintBoundary`<br>• `IconTreeShaker` 提取码位，`ShaderCompiler` 编译<br>• 门禁：手势仲裁胜负严格对齐；字体裁剪率 > 90%，着色器离线打包。 |
+| **阶段五** | 第 15~18 周 | **模块 8 & Android 宿主**<br>(动画物理场 / 真机闭环) | **模块 C4 & 模块 C6**<br>(AOT 快照生成 / Native Assets) | • 极简 Android Native APK 宿主，SurfaceView 真实显示<br>• `AOTSnapshotter` 组装参数，解析 4 大内存段；生成插件路由<br>• 门禁：在真机上流畅运行纯自研微内核交互界面；AOT 符号解析无误。 |
+| **阶段六** | 第 19~20 周 | **全域双轨差分收敛**<br>(孪生比对 / 白皮书总结) | **编译期全链路闭环**<br>(端到端包体输出 / 结项) | • 《Flutter 底层架构与编译期解构白皮书》全套（共 14 篇）<br>• 全量 50+ 个原子功能点双轨差分测试报告<br>• 门禁：NanoCompiler 编排出的产物在 NanoFlutter 上工业级对齐呈现。 |
 
 ---
 
-## 八、 核心技术风险与架构防范机制（Pre-mortem Analysis）
+## 八、 全域核心技术风险与架构防范机制（Pre-mortem Analysis）
 
-纯粹从底层架构与软件工程的技术维度审视，本工程在实施过程中存在以下 **5 大核心致命技术风险**。必须在前期顶层设计中建立前置防范机制，杜绝中途返工：
+纯粹从底层架构与软件工程的技术维度审视，本工程在实施过程中存在以下 **8 大核心致命技术风险（5 个运行时风险 + 3 个编译期风险）**。必须在前期顶层设计中建立前置防范机制，杜绝中途返工：
 
 ```mermaid
 flowchart TD
-    subgraph FatalRisks [可能导致项目技术崩塌的 5 大深水区暗礁]
+    subgraph FatalRisks [可能导致项目技术崩塌的 8 大深水区暗礁]
         R1["致命风险 1: dart:ui 宿主环境的'不可穿透性'<br>导致差分测试命名空间死锁"]
         R2["致命风险 2: 文本排版黑盒的'隐式穿透性'<br>击穿差分测试的几何精度"]
         R3["致命风险 3: 跨三语言堆栈 (Dart GC / C++ / JVM)<br>引发的异步时钟与野指针崩溃"]
         R4["致命风险 4: 渲染管线位运算状态机隐式耦合<br>引发脏节点标记雪崩与死循环"]
         R5["致命风险 5: 物理像素对齐 (Pixel Snapping)<br>累积误差击垮自动化断言体系"]
+        CR1["致命风险 6: Kernel AST 二进制跨小版本不兼容<br>导致 Dill 差异比对器反序列化崩溃"]
+        CR2["致命风险 7: 常驻编译器 Stdio 状态机死锁<br>子进程管道缓冲区溢出引发热重载永久挂死"]
+        CR3["致命风险 8: 热重载中类结构修改 (Schema Mutation)<br>引发运行时 VM 拒绝重载并撕裂 State"]
     end
 ```
 
@@ -379,4 +504,26 @@ flowchart TD
     逻辑坐标是 `double` 浮点数，物理屏幕是离散整数。官方为防止模糊引入了像素吸附算法：`snapped = round(logical * ratio) / ratio`。若自研微内核未精确复刻吸附规则，在深层嵌套下浮点微差会被逐级放大，导致差分断言（$\le 0.001\text{px}$）疯狂误报，使测试套件失效。
 *   **架构防范方案**：
     *   **统一精度归一化工具（MathSnapping Layer）**：1:1 提取官方 `matrix_utils.dart` 浮点数比较与物理吸附方法，所有几何测算强制走统一归一化截断。
+
+### 6. 致命风险 6：Kernel AST 二进制格式跨小版本的破坏性不兼容
+*   **风险机理**：
+    Dart Kernel AST（`.dill`）不是长期稳定的文件格式，其二进制 Tag 编码随 Dart SDK 小版本升级而变动。若直接用二进制字节比对官方与自研产物，即使语义 100% 一致，也会因格式版本微差导致差分测试大面积红斑崩溃。
+*   **架构防范方案**：
+    *   **锁定统一 SDK 基准**：全局强制绑定 `./flutter_source/flutter/bin/dart`，禁止使用宿主系统的任意第三方 Dart 版本。
+    *   **语义树差异比对 (AST Semantic Diff)**：差分比对不对比原始二进制流，而是将 `.dill` 转换为人类可读的 AST 文本表示，针对类名、字段名、方法体指令序列进行语义级等价断言。
+
+### 7. 致命风险 7：常驻编译器 Stdio 文本交互状态机死锁与管道阻塞
+*   **风险机理**：
+    `DefaultResidentCompiler` 与 `frontend_server` 通过 stdin/stdout 进行长连接双向通信。如果某条编译报错输出超出操作系统管道缓冲区且没有及时异步消费，或者前端由于语法错误未吐出预期的结束符，主进程会陷入永久 `await` 死锁。
+*   **架构防范方案**：
+    *   **非阻塞双工流缓冲区封装**：以行（LineSplitter）为单位消费标准输出，所有响应设置严格的看门狗超时（Watchdog Timeout, 10 秒超时强杀并报错）。
+    *   **明确错误状态转移**：收到前端报错时，状态机必须强行迁移至 `rejected` 状态并执行通道清空（Drain），杜绝残存脏数据污染下一轮交互。
+
+### 8. 致命风险 8：热重载类结构修改引发 VM 拒绝与状态撕裂
+*   **风险机理**：
+    Flutter 热重载禁止给已有类增删字段、修改类继承关系或修改枚举。若开发者修改了类结构，Dart VM Service 会抛出 `kIsolateReloadBarred` 异常。若系统未正确识别该异常，强行派发 `reassemble()`，会导致新旧对象内存布局不匹配，引发原生 `SIGSEGV` 闪退。
+*   **架构防范方案**：
+    *   **Schema 预检与降级保护**：在触发 `reloadSources` 前，差分扫描类定义元数据；若检测到字段变动，主动拦截热重载并向开发者提示必须执行热重启（Hot Restart, `R`）。
+    *   **状态保留原子回滚**：如果 VM 报错，立即向编译器发送 `reject` 指令回滚编译器内部状态，保持运行时旧代码与内存状态的完整性。
+
 

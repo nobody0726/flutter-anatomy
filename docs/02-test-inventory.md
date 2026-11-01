@@ -1,21 +1,22 @@
-# Flutter 功能点测试用例清单与验证矩阵 (Test Inventory)
+# Flutter 全域功能点测试用例清单与验证矩阵 (Test Inventory)
 
-> **基准功能集**：[`01-feature-set.md`](./01-feature-set.md) 中的 46 个核心功能点（涵盖 8 大领域）  
-> **检索范围**：`flutter_source/flutter` 全树（包含 `packages/flutter/test/` 与 `engine/src/flutter/`）  
+> **基准功能集**：[`01-feature-set.md`](./01-feature-set.md) 中的 70+ 个核心功能点（涵盖 14 大领域：运行期 8 领域 + 编译期 6 领域）  
+> **检索范围**：`flutter_source/flutter` 全树（包含 `packages/flutter/test/`、`engine/src/flutter/` 与 `packages/flutter_tools/test/`）  
 > **检索方式**：实名核对官方实际存在的测试文件与测试用例函数，建立 1:1 映射  
-> **文档索引**：[`00_master_plan_and_methodology.md`](./00_master_plan_and_methodology.md) | **上游**：[`01-feature-set.md`](./01-feature-set.md) | **下游**：[`03-roadmap.md`](./03-roadmap.md)
+> **文档索引**：[`00_master_plan_and_methodology.md`](./00_master_plan_and_methodology.md) | [`00_compile_time_master_plan.md`](./00_compile_time_master_plan.md) | **上游**：[`01-feature-set.md`](./01-feature-set.md) | **下游**：[`03-roadmap.md`](./03-roadmap.md)
 
 ---
 
 ## 0. 测试资源与验证方法论
 
-### 0.1 三类官方测试资源分类
+### 0.1 四类官方测试资源分类
 
 | 类型 | 源码位置 | 测试形态 | 驱动方式 |
 |---|---|---|---|
 | **A. Framework 单元测试** | `packages/flutter/test/*/*_test.dart` | 纯 Dart 单元测试，基于 `flutter_test` / `test` 包 | `dart test` 命令行执行 |
 | **B. Engine C++ 单元测试** | `engine/src/flutter/*/*unittests.cc` | 基于 GoogleTest (gtest) 的原生 C++ 单元测试 | 原生可执行二进制运行 |
 | **C. Android Embedder 测试** | `engine/src/flutter/shell/platform/android/test/*Test.java` | 基于 JUnit / Robolectric 的 Android 宿主测试 | Gradle `test` 任务执行 |
+| **D. Toolchain 工具链测试** | `packages/flutter_tools/test/*/*_test.dart` | 纯 Dart 单元测试，基于 FakeFileSystem、FakeProcessManager | `dart test` 命令行执行 |
 
 ### 0.2 NanoFlutter 仿真三阶测试矩阵
 
@@ -133,3 +134,70 @@
 | **EMB-03** | StandardMessageCodec 二进制流编解码 | `engine/src/flutter/shell/platform/android/test/io/flutter/plugin/common/StandardMessageCodecTest.java`<br>`packages/flutter/test/services/standard_message_codec_test.dart` | `testPrimitiveEncodingDecoding()`<br>`testNestedMapAndListSerialization()`<br>`testBigEndianByteArrayAlignment()` | `tests/unit/standard_message_codec_test.dart`<br>对比 Dart 编码与 C++/Java 解码的二进制字节流绝对一致性。 |
 | **EMB-04** | VsyncWaiterAndroid 硬件时钟对齐 | `engine/src/flutter/shell/platform/android/test/io/flutter/view/VsyncWaiterTest.java` | `testFrameCallbackRegistration()`<br>`testHardwareVsyncPropagation()` | `tests/unit/vsync_waiter_test.dart`<br>验证 Choreographer 帧脉冲到 C++ 回调的时间戳无抖动。 |
 | **EMB-05** | PlatformViews 原生视图混合渲染拓扑 | `engine/src/flutter/shell/platform/android/test/io/flutter/plugin/platform/PlatformViewsControllerTest.java` | `testPlatformViewCreation()`<br>`testTextureLayerComposition()` | `tests/unit/platform_views_test.dart`<br>模拟原生 View 纹理在 Flutter 场景树中的嵌入与拉伸。 |
+
+---
+
+## 9. 构建编排引擎与增量缓存（BLD: 1~5）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **BLD-01** | BuildSystem DAG 拓扑排序调度器 | `packages/flutter_tools/test/general.shard/build_system/build_system_test.dart` | `testUsingContext('BuildSystem can resolve dependency graph')`<br>`testUsingContext('Throws CircularDependencyException on graph cycle')` | `tests/unit/build_system_dag_test.dart`<br>构建多层菱形与环形 Target 拓扑，断言执行序并拦截死循环。 |
+| **BLD-02** | FileStore 文件 SHA-256 指纹持久化 | `packages/flutter_tools/test/general.shard/build_system/file_store_test.dart` | `testUsingContext('FileStore calculates sha256 and detects changes')`<br>`testUsingContext('FileStore persists state to disk')` | `tests/unit/file_store_hash_test.dart`<br>单测修改文件内容与只改时间戳两种场景，断言哈希重新计算行为。 |
+| **BLD-03** | Makefile .d Depfile 增量依赖语法解析 | `packages/flutter_tools/test/general.shard/build_system/depfile_test.dart` | `testWithoutContext('Depfile parser handles simple and escaped dependencies')`<br>`testWithoutContext('Depfile handles whitespace and backslashes')` | `tests/unit/depfile_parser_test.dart`<br>测试边界语法输入，断言解析出的输入文件绝对路径列表 100% 对齐。 |
+| **BLD-04** | Target.canSkip 增量短路判定机制 | `packages/flutter_tools/test/general.shard/build_system/build_system_test.dart` | `testUsingContext('Target.canSkip returns true if inputs/outputs unchanged')`<br>`testUsingContext('Target.canSkip returns false if output missing')` | `tests/unit/target_skip_test.dart`<br>断言未变动工程第二次执行 `build()` 时所有 Target 均被 skip。 |
+| **BLD-05** | Environment 构建上下文与参数求值 | `packages/flutter_tools/test/general.shard/build_system/build_system_test.dart` | `testUsingContext('Environment correctly decodes defines and artifacts')`<br>`testUsingContext('Environment handles missing defines')` | `tests/unit/build_environment_test.dart`<br>断言逗号分隔列表解码与跨平台目录解析逻辑。 |
+
+---
+
+## 10. Dart Kernel 前端编译与 AST 变换（KRN: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **KRN-01** | KernelCompiler 前端批处理调用 | `packages/flutter_tools/test/general.shard/compile_test.dart`<br>`compile_batch_test.dart` | `testUsingContext('KernelCompiler outputs app.dill on success')`<br>`testUsingContext('KernelCompiler surfaces frontend server errors')` | `tests/unit/kernel_compiler_test.dart`<br>通过 FakeProcessManager 拦截命令行参数，断言参数构造与产物检验。 |
+| **KRN-02** | TrackWidgetCreation 构造函数坐标注桩 | `packages/flutter_tools/test/general.shard/build_system/targets/common_test.dart` | `testUsingContext('KernelSnapshot passes trackWidgetCreation to frontend server')`<br>`testUsingContext('Release build disables trackWidgetCreation')` | `tests/unit/track_widget_creation_test.dart`<br>输入一段 Dart 源码 AST，断言注桩后每个 Widget 节点均注入 `_Location`。 |
+| **KRN-03** | TargetModel 目标平台标准库规范映射 | `packages/flutter_tools/test/general.shard/compile_batch_test.dart` | `testUsingContext('TargetModel matches platform requirements')` | `tests/unit/target_model_test.dart`<br>枚举全部 TargetPlatform，断言映射到的 TargetModel 无一错漏。 |
+| **KRN-04** | ConstCanonicalization 常量规范折叠 | `packages/flutter_tools/test/general.shard/compile_expression_test.dart` | `testUsingContext('Const canonicalization in kernel output')` | `tests/unit/const_folding_test.dart`<br>验证两个相同值的 const 表达式在 AST 中被规范化为同一引用。 |
+
+---
+
+## 11. 增量编译守护与热重载重构（HOT: 1~5）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **HOT-01** | ResidentCompiler Stdio 协议状态机 | `packages/flutter_tools/test/general.shard/compile_incremental_test.dart` | `testUsingContext('ResidentCompiler correctly handles compile, recompile, accept, reject sequence')`<br>`testUsingContext('ResidentCompiler recovers from broken pipe')` | `tests/unit/resident_compiler_protocol_test.dart`<br>模拟 Stdio 字符串交互流，断言状态迁移与看门狗超时机制。 |
+| **HOT-02** | Incremental Kernel Delta Dill 生成 | `packages/flutter_tools/test/general.shard/compile_incremental_test.dart` | `testUsingContext('ResidentCompiler generates delta dill on modified files')` | `tests/unit/delta_kernel_generator_test.dart`<br>单测修改单个文件，断言生成的增量 dill 仅包含变更库。 |
+| **HOT-03** | DevFS 内存文件系统差分同步协议 | `packages/flutter_tools/test/general.shard/devfs_test.dart` | `testUsingContext('DevFS correctly diffs and syncs updated files to device')`<br>`testUsingContext('DevFS skips unmodified asset files')` | `tests/unit/devfs_sync_test.dart`<br>本地修改文件后比对内存 DevFS，断言增量推送包大小仅等于修改文件字节。 |
+| **HOT-04** | VM Service reloadSources RPC 驱动 | `packages/flutter_tools/test/general.shard/hot_test.dart` | `testUsingContext('HotRunner triggers _reloadSources RPC and handles error code')`<br>`testUsingContext('Handles kIsolateReloadBarred exception')` | `tests/unit/vm_service_reload_test.dart`<br>模拟 VM Service RPC 响应，断言热重载失败时降级提示热重启。 |
+| **HOT-05** | Element.reassemble 运行时状态重塑 | `packages/flutter/test/widgets/framework_test.dart` | `testWidgets('Element reassemble marks all dirty while preserving State')`<br>`testWidgets('State.reassemble is called on rebuild')` | `tests/unit/reassemble_state_preservation_test.dart`<br>在微内核中调用 `reassemble()`，断言所有 RenderObject 重绘且 State 内存实例地址不变。 |
+
+---
+
+## 12. 生产态 AOT 快照编译与多段二进制生成（AOT: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **AOT-01** | AOTSnapshotter 参数编排与进程调用 | `packages/flutter_tools/test/general.shard/build_system/targets/common_test.dart` | `testUsingContext('AotSnapshotBase invokes AOTSnapshotter with correct arguments')`<br>`testUsingContext('Throws on unsupported AOT platform')` | `tests/unit/aot_snapshotter_args_test.dart`<br>断言 Profile 与 Release 模式下的 gen_snapshot 开关矩阵。 |
+| **AOT-02** | 4 大内存段映射结构解析 | `engine/src/flutter/runtime/dart_snapshot_unittests.cc` | `TEST(DartSnapshotTest, MmapAndResolveFourSegments)` | `tests/unit/snapshot_segment_parser_test.dart`<br>解析 ELF 共享库符号表，断言 `kSnapshotData` 与 `kSnapshotInstructions` 四大段偏移与尺寸。 |
+| **AOT-03** | Type Flow Analysis (TFA) 全局树摇分析 | `packages/flutter_tools/test/general.shard/build_system/targets/android_test.dart` | `testUsingContext('AotSnapshot builds libapp.so with TFA stripped unused classes')` | `tests/unit/tfa_tree_shake_test.dart`<br>断言未被任何调用链触达的死类死方法从符号表中彻底消失。 |
+| **AOT-04** | DWARF 调试符号分离与混淆映射 | `packages/flutter_tools/test/general.shard/build_system/targets/common_test.dart` | `testUsingContext('AotSnapshot outputs split debug info and obfuscation mapping')` | `tests/unit/dwarf_split_test.dart`<br>断言符号分离后 `app.so` 明显精简且产出独立符号映射文件。 |
+
+---
+
+## 13. 资产多维树摇与离线着色器预编译（SHK: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **SHK-01** | IconTreeShaker AST 常量码位扫描 | `packages/flutter_tools/test/general.shard/build_system/targets/icon_tree_shaker_test.dart` | `testUsingContext('IconTreeShaker parses recorded_uses.json correctly')`<br>`testUsingContext('Extracts constant code points from AST')` | `tests/unit/icon_code_point_extractor_test.dart`<br>构造包含 10 个特定 IconData 的用例，断言码位提取结果 100% 精确。 |
+| **SHK-02** | font-subset 字体文件物理裁剪集成 | `packages/flutter_tools/test/commands.shard/permeable/icon_tree_shaker_test.dart` | `testUsingContext('Font subset utility reduces TTF font file size by >90%')` | `tests/unit/font_subset_integration_test.dart`<br>基于提取码位裁剪官方 MaterialIcons 字体，断言保留字形与文件体积。 |
+| **SHK-03** | impellerc 离线着色器编译与打包 | `packages/flutter_tools/test/general.shard/build_system/targets/shader_compiler_test.dart` | `testUsingContext('ShaderCompiler compiles GLSL and packages ShaderBundle')`<br>`testUsingContext('DevelopmentShaderCompiler supports hot reload')` | `tests/unit/shader_bundle_pack_test.dart`<br>模拟将顶点与片元着色器打包为合法二进制 ShaderBundle。 |
+| **SHK-04** | AssetManifest.bin 二进制清单序列化 | `packages/flutter_tools/test/general.shard/build_system/targets/assets_test.dart` | `testUsingContext('CopyAssets produces AssetManifest.bin and depfile')` | `tests/unit/asset_manifest_binary_test.dart`<br>序列化复杂多分辨率资产字典，断言反序列化结果无损对齐。 |
+
+---
+
+## 14. 插件元编程与 Native Assets（GEN: 1~3）
+
+| 功能 ID | 功能名称 | 官方源码对应测试文件 | 官方覆盖的测试用例 / 测试函数 | NanoCompiler 仿真测试实现路径 |
+|---|---|---|---|---|
+| **GEN-01** | DartPluginRegistrantTarget 代码动态合成 | `packages/flutter_tools/test/general.shard/build_system/targets/dart_plugin_registrant_test.dart` | `testUsingContext('DartPluginRegistrantTarget generates valid dart code')` | `tests/unit/plugin_registrant_generator_test.dart`<br>输入包含 3 个插件的 pubspec，断言生成的 `dart_plugin_registrant.dart` 语法合法且类名一致。 |
+| **GEN-02** | Native Assets build.dart 编译钩子编排 | `packages/flutter_tools/test/general.shard/isolated/build_system/targets/native_assets_test.dart` | `testUsingContext('BuildHooks target executes build.dart and maps C-ABI assets')` | `tests/unit/native_assets_hook_test.dart`<br>测试 Native Assets 配置生成与动态库路径解析。 |
+| **GEN-03** | GenerateLocalizationsTarget 国际化代码生成 | `packages/flutter_tools/test/general.shard/build_system/targets/localizations_test.dart` | `testUsingContext('GenerateLocalizationsTarget parses arb and generates localization code')` | `tests/unit/localizations_codegen_test.dart`<br>解析中英文 ARB 文件，断言生成的消息格式化方法。 |

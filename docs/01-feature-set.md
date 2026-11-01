@@ -1,9 +1,9 @@
-# Flutter 引擎与框架功能全集（NanoFlutter 需求追踪矩阵 RTM）
+# Flutter 全域引擎、框架与工具链功能全集（NanoFlutter + NanoCompiler 需求追踪矩阵 RTM）
 
-> **基准源码**：`flutter_source/flutter`（Monorepo 快照，包含 Framework 与 Engine）  
+> **基准源码**：`flutter_source/flutter`（Monorepo 快照，包含 Framework、Engine 与 `flutter_tools` 工具链）  
 > **设计方法论**：Triple-Axis Cross-Verification —— 官方源码实现 × 运行时架构契约 × 1:1 仿真微内核 三维对账  
-> **文档性质**：NanoFlutter 解构与 1:1 原理仿真的全量功能需求集（Requirements Traceability Matrix, RTM）  
-> **文档索引**：[`00_master_plan_and_methodology.md`](./00_master_plan_and_methodology.md) | **下游**：[`02-test-inventory.md`](./02-test-inventory.md)、[`03-roadmap.md`](./03-roadmap.md)
+> **文档性质**：NanoFlutter 运行时与 NanoCompiler 编译期 1:1 原理仿真的全量功能需求集（Requirements Traceability Matrix, RTM）  
+> **文档索引**：[`00_master_plan_and_methodology.md`](./00_master_plan_and_methodology.md) | [`00_compile_time_master_plan.md`](./00_compile_time_master_plan.md) | **下游**：[`02-test-inventory.md`](./02-test-inventory.md)、[`03-roadmap.md`](./03-roadmap.md)
 
 ---
 
@@ -12,29 +12,35 @@
 ### 0.1 三维交叉对账矩阵
 
 ```
-[维度 1: 官方源码物理实现]  ──►  [NanoFlutter RTM 需求矩阵]  ◄──  [维度 2: 架构契约与状态机]
-                                           │
-                                           ▼
-                                [维度 3: 1:1 独立微内核复刻]
-                         (纯 Dart Framework + 现代 C++ 宿主桥接)
+[维度 1: 官方源码物理实现]  ──►  [NanoFlutter + NanoCompiler RTM 需求矩阵]  ◄──  [维度 2: 架构契约与状态机]
+                                                   │
+                                                   ▼
+                                        [维度 3: 1:1 独立微内核复刻]
+                          (纯 Dart Framework + 现代 C++ 宿主桥接 + 轻量独立编译器)
 ```
 
 - **维度 1（源码无遗漏）**：`flutter_source` 下相关源码文件中的关键类、核心方法必须 100% 映射到功能点 ID。
-- **维度 2（契约无死角）**：渲染管线单次遍历法则、三棵树解耦契约、手势仲裁协议完整覆盖。
-- **维度 3（微内核独立性）**：所有功能点均在 `nano_flutter` 中具备无官方框架依赖的纯净代码实现。
+- **维度 2（契约无死角）**：渲染管线单次遍历法则、三棵树解耦契约、构建 DAG 依赖、增量缓存与热重载状态保留协议完整覆盖。
+- **维度 3（微内核独立性）**：所有功能点均在 `nano_flutter` 与 `nano_compiler` 中具备无官方黑盒框架依赖的纯净代码实现。
 
 ### 0.2 功能 ID 编码规则
 
-| 前缀 | 所属子系统 / 领域 | 覆盖模块 |
-|---|---|---|
-| **SCH-nn** | 线程并发、消息循环与时钟调度 (Scheduler & Concurrency) | 模块 2 |
-| **LAY-nn** | 单次遍历盒模型与渲染管线微内核 (Box Layout & Pipeline) | 模块 3 |
-| **FLX-nn** | 弹性盒 Flex 模型、多子容器与滚动切片 (Flex & Slivers) | 模块 4 |
-| **WID-nn** | 响应式三棵树状态机与 Reconciliation (Widgets & Elements) | 模块 5 |
-| **COM-nn** | 图层树合成、RepaintBoundary 缓存与光栅管线 (Layer & Compositing) | 模块 6 |
-| **ARE-nn** | 输入事件拓扑路由与手势竞技场仲裁 (HitTest & Gesture Arena) | 模块 7 |
-| **ANI-nn** | 时钟驱动动画、缓动曲线与物理仿真 (Animation & Physics) | 模块 8 |
-| **EMB-nn** | Android 宿主嵌入层与跨语言双向通讯 (Android Embedder & JNI) | 模块 1 |
+| 前缀 | 所属子系统 / 领域 | 覆盖模块 | 体系域 |
+|---|---|---|---|
+| **SCH-nn** | 线程并发、消息循环与时钟调度 (Scheduler & Concurrency) | 模块 2 | 运行期微内核 |
+| **LAY-nn** | 单次遍历盒模型与渲染管线微内核 (Box Layout & Pipeline) | 模块 3 | 运行期微内核 |
+| **FLX-nn** | 弹性盒 Flex 模型、多子容器与滚动切片 (Flex & Slivers) | 模块 4 | 运行期微内核 |
+| **WID-nn** | 响应式三棵树状态机与 Reconciliation (Widgets & Elements) | 模块 5 | 运行期微内核 |
+| **COM-nn** | 图层树合成、RepaintBoundary 缓存与光栅管线 (Layer & Compositing) | 模块 6 | 运行期微内核 |
+| **ARE-nn** | 输入事件拓扑路由与手势竞技场仲裁 (HitTest & Gesture Arena) | 模块 7 | 运行期微内核 |
+| **ANI-nn** | 时钟驱动动画、缓动曲线与物理仿真 (Animation & Physics) | 模块 8 | 运行期微内核 |
+| **EMB-nn** | Android 宿主嵌入层与跨语言双向通讯 (Android Embedder & JNI) | 模块 1 | 运行期微内核 |
+| **BLD-nn** | 构建编排引擎、DAG 拓扑与增量缓存 (Build Graph & Depfile) | 模块 C1 | 编译期工具链 |
+| **KRN-nn** | Dart Kernel 前端编译与 AST 专项变换 (Kernel & AST Transforms) | 模块 C2 | 编译期工具链 |
+| **HOT-nn** | 增量编译守护、DevFS 传输与热重载重构 (Incremental Compiler & Hot Reload) | 模块 C3 | 编译期工具链 |
+| **AOT-nn** | 生产态 AOT 快照编译与多段二进制生成 (AOT Snapshotting & Code Generation) | 模块 C4 | 编译期工具链 |
+| **SHK-nn** | 资产多维树摇与离线着色器预编译 (Asset Tree-Shaking & Impellerc) | 模块 C5 | 编译期工具链 |
+| **GEN-nn** | 插件自动注册元编程与 Native Assets (Plugin Codegen & Native Assets) | 模块 C6 | 编译期工具链 |
 
 ---
 
@@ -140,3 +146,70 @@
 | **EMB-03** | StandardMessageCodec 二进制流编解码 | `engine/src/flutter/shell/platform/android/io/flutter/plugin/common/StandardMessageCodec.java:90`<br>`packages/flutter/lib/src/services/message_codecs.dart:400` | 高性能二进制序列化规范：大端序；支持 null, bool, int32, int64, float64, string, list, map 零拷贝解包。 | 1:1 实现 Dart 与 Java/C++ 双端一致的序列化编解码器。 |
 | **EMB-04** | VsyncWaiterAndroid 硬件时钟对齐 | `engine/src/flutter/shell/platform/android/io/flutter/view/VsyncWaiter.java:30` | 注册 `Choreographer.FrameCallback`；将 `frameTimeNanos` 经 JNI 传递给 C++ `onVsync` 调度器。 | Android 端硬件刷新率捕获器，实现 60/120Hz 稳定对齐。 |
 | **EMB-05** | PlatformViews 原生视图混合渲染拓扑 | `engine/src/flutter/shell/platform/android/io/flutter/plugin/platform/PlatformViewsController.java:150` | 原生 Android View（如原生 Map/WebView）嵌入 Flutter 层级；解构 TextureLayer 与 HybridComposition 原理。 | 仿真外部纹理（External Texture）合成与触摸事件透传。 |
+
+---
+
+## 9. 构建编排引擎与增量缓存（BLD: 1~5）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **BLD-01** | BuildSystem DAG 拓扑排序调度器 | `packages/flutter_tools/lib/src/build_system/build_system.dart:450` | 将 `Target` 构造成有向无环图；依赖项严格拓扑先序执行；环形依赖抛出 `CircularDependencyException`。 | 纯 Dart DAG 调度器，支持异步并发与拓扑剪枝。 |
+| **BLD-02** | FileStore 文件 SHA-256 指纹缓存与持久化 | `packages/flutter_tools/lib/src/build_system/file_store.dart:90` | 时间戳初筛 + SHA-256 细筛；未变动文件哈希持久化至磁盘 `.flutter-plugins-dependencies`。 | `NanoFileStore`，实现高效增量变更指纹检测。 |
+| **BLD-03** | Makefile .d Depfile 增量依赖语法解析 | `packages/flutter_tools/lib/src/build_system/depfile.dart:80` | 解析形如 `output: input1 input2` 的依赖语法，正确处理转义字符与空格。 | 1:1 实现标准 Depfile 解析器与序列化器。 |
+| **BLD-04** | Target.canSkip 增量短路判定机制 | `packages/flutter_tools/lib/src/build_system/build_system.dart:580` | 当且仅当所有输入文件哈希未变且所有声明输出文件均存在时，短路跳过当前任务。 | 1:1 复刻跳过算法，保证 No-op 构建毫秒级返回。 |
+| **BLD-05** | Environment 构建上下文与参数求值 | `packages/flutter_tools/lib/src/build_system/build_system.dart:180` | 注入 `buildDir`、`defines`、`artifacts`；支持逗号分隔参数与环境变量插值。 | 强类型上下文容器，提供参数校验与默认值回退。 |
+
+---
+
+## 10. Dart Kernel 前端编译与 AST 变换（KRN: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **KRN-01** | KernelCompiler 前端批处理调用 | `packages/flutter_tools/lib/src/compile.dart:150` | 组装参数调用 `frontend_server`，输出根模块 `app.dill`；错误计数 `errorCount == 0` 为成功门禁。 | 命令行参数组装器与批处理执行模拟桩。 |
+| **KRN-02** | TrackWidgetCreation 构造函数源码坐标注桩 | `packages/flutter_tools/lib/src/build_system/targets/common.dart:289`<br>Dart CFE `transform_widget_creator.dart` | 在所有 Widget 构造调用点自动注入 `_Location(file, line, column, name)`；Release 模式强行关闭。 | 简易 AST 访问器，1:1 实现构造函数物理坐标注入。 |
+| **KRN-03** | TargetModel 目标平台标准库规范映射 | `packages/flutter_tools/lib/src/compile.dart:65` | 支持 `flutter`、`flutter_runner`、`vm`、`dartdevc` 四大模式；根据平台解析核心库绑定。 | 强类型目标模型解析器。 |
+| **KRN-04** | ConstCanonicalization 不可变常量规范折叠 | Dart CFE 常量池计算规范 | 跨文件相同参数的 `const` 实例在 AST 编译期合并为同一内存对象指针。 | 常量池哈希表，实现编译期不可变对象规范化。 |
+
+---
+
+## 11. 增量编译守护与热重载重构（HOT: 1~5）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **HOT-01** | ResidentCompiler Stdio 交互协议状态机 | `packages/flutter_tools/lib/src/compile.dart:637` | 基于标准输入输出的双工长连接状态机；命令流：`compile` $\rightarrow$ `recompile` $\rightarrow$ `accept` / `reject` $\rightarrow$ `quit`。 | 1:1 实现 Stdio 状态机，包含看门狗超时防死锁。 |
+| **HOT-02** | Incremental Kernel Delta Dill 增量切片生成 | `packages/flutter_tools/lib/src/compile.dart:820` | 仅计算自上次 `accept` 以来被修改的文件集合；生成微型 Delta Kernel 补丁。 | 增量补丁生成器与修改集追踪器。 |
+| **HOT-03** | DevFS 内存文件系统差分同步协议 | `packages/flutter_tools/lib/src/devfs.dart:120` | 比对本地文件与远端内存文件系统摘要，仅推送修改文件的字节内容至 VM。 | 纯 Dart 虚拟文件系统与差分字节序列化器。 |
+| **HOT-04** | VM Service reloadSources RPC 驱动 | `packages/flutter_tools/lib/src/run_hot.dart:905`<br>`vmservice.dart:450` | 调起 VM Service 的 `_reloadSources` RPC；成功后触发新代码重链接；捕获 `kIsolateReloadBarred`。 | 模拟 VM Service JSON-RPC 客户端与重载错误捕获。 |
+| **HOT-05** | Element.reassemble 运行时无损状态重塑 | `packages/flutter/lib/src/widgets/framework.dart:2850` | 收到重载信号后遍历整树，标记所有 Element 脏状态并触发重建；保持原有 `State` 内存实例不销毁。 | 协同 `nano_flutter` 验证三棵树重塑与状态无损保持。 |
+
+---
+
+## 12. 生产态 AOT 快照编译与多段二进制生成（AOT: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **AOT-01** | AOTSnapshotter 参数编排与进程调用 | `packages/flutter_tools/lib/src/base/build.dart:91` | 校验 AOT 平台兼容性；根据架构组装 `--deterministic`、`--snapshot-kind=app-aot-elf` 参数。 | 参数生成器与进程退出码门禁校验。 |
+| **AOT-02** | 4 大内存段映射结构解析 | `engine/src/flutter/runtime/dart_snapshot.cc:75` | ELF 共享库中严格包含：`vm_snapshot_data`、`vm_snapshot_instr`、`isolate_snapshot_data`、`isolate_snapshot_instr`。 | ELF 符号段结构分析器，验证 4 大段物理完整性。 |
+| **AOT-03** | Type Flow Analysis (TFA) 全局树摇分析 | Dart SDK `pkg/vm/lib/transformations/type_flow/` | 基于封闭世界假设分析类型调用图；剔除从未调用的类、方法与字段。 | 树摇分析验证器，断言未引用类在最终产物中被剔除。 |
+| **AOT-04** | DWARF 调试符号分离与混淆映射 | `packages/flutter_tools/lib/src/base/build.dart:310` | 提取调试符号至独立文件 (`split-debug-info`)；生成符号混淆映射表。 | 符号提取编排验证器。 |
+
+---
+
+## 13. 资产多维树摇与离线着色器预编译（SHK: 1~4）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **SHK-01** | IconTreeShaker AST 常量码位扫描 | `packages/flutter_tools/lib/src/build_system/targets/icon_tree_shaker.dart:180` | 扫描源码中所有 `IconData` 常量实参，提取 codePoint 列表并写入 `recorded_uses.json`。 | 1:1 实现码位提取器，覆盖常规与第三方包图标。 |
+| **SHK-02** | font-subset 字体文件物理裁剪集成 | `engine/src/flutter/tools/font_subset/main.cc:40` | 基于 HarfBuzz 将 TTF 字体裁剪为仅含目标码位的微型字体；体积缩减 > 90%。 | 调用本地 `font-subset` 或执行字形保留断言。 |
+| **SHK-03** | impellerc 离线着色器编译与打包 | `packages/flutter_tools/lib/src/build_system/tools/shader_compiler.dart:120`<br>`engine/src/flutter/impeller/compiler/` | 调用 `impellerc` 将 GLSL 源码编译为 SPIR-V 与目标平台着色器，组装输出 `ShaderBundle`。 | 离线着色器打包器，生成平台无关伪 ShaderBundle。 |
+| **SHK-04** | AssetManifest.bin 紧凑二进制清单序列化 | `packages/flutter_tools/lib/src/asset.dart:450` | 解析 `pubspec.yaml` 资产与分辨率变体，序列化为高性能二进制字节流。 | 1:1 实现资产清单二进制编解码器。 |
+
+---
+
+## 14. 插件元编程与 Native Assets（GEN: 1~3）
+
+| 功能 ID | 功能名称 | 官方源码规范依据 | 状态机/不变式契约 | NanoCompiler 仿真目标 |
+|---|---|---|---|---|
+| **GEN-01** | DartPluginRegistrantTarget 代码动态合成 | `packages/flutter_tools/lib/src/build_system/targets/dart_plugin_registrant.dart:48` | 解析 `pubspec.lock` 与插件平台声明，基于 Mustache 模板生成注册引导代码。 | 纯 Dart 模板生成器，1:1 合成插件注册源码。 |
+| **GEN-02** | Native Assets build.dart 编译钩子编排 | `packages/flutter_tools/lib/src/build_system/targets/native_assets.dart:34` | 调度 package 根目录下的 `build.dart` 钩子，解析 C/C++ FFI 原生库输出路径。 | Native Assets 协议交互模拟器。 |
+| **GEN-03** | GenerateLocalizationsTarget 国际化代码生成 | `packages/flutter_tools/lib/src/build_system/targets/localizations.dart:40` | 解析 `.arb` 文件，生成类型安全的本地化类与复数处理逻辑。 | ARB 解析与 Dart 国际化文件生成器。 |
